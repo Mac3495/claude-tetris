@@ -1,0 +1,55 @@
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Triage issue with Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            A new GitHub issue has been opened. Analyze it and do the following using the `gh` CLI:
+
+            **Issue details:**
+            - Title: ${{ github.event.issue.title }}
+            - Body: ${{ github.event.issue.body }}
+            - Number: ${{ github.event.issue.number }}
+            - Repository: ${{ github.repository }}
+
+            **Step 1 — Apply labels.**
+            Use `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "<label>"` to add one or more of these labels based on the issue content:
+            - `bug` — something is broken or not working as expected
+            - `enhancement` — a new feature or improvement request
+            - `question` — asking for clarification or help
+            - `documentation` — relates to docs, comments, or README
+            - `performance` — speed, memory, or efficiency concern
+            - `ui` — visual or layout issue
+            - `gameplay` — relates to game mechanics or rules
+            - `good first issue` — simple enough for a first-time contributor
+
+            Only add labels that clearly apply. You may add multiple.
+
+            **Step 2 — Post a comment.**
+            Use `gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "<markdown>"` to post a comment with:
+
+            1. A brief **summary** of what the issue is about (1–2 sentences).
+            2. A **root cause analysis** section: explain what in the codebase likely causes this (refer to `game.js`, `index.html`, or `style.css` as appropriate).
+            3. A **suggested fix** section: concrete steps or code snippets showing how to address the issue.
+            4. An **estimated complexity** line: Low / Medium / High with a one-sentence reason.
+
+            Write the comment in clean GitHub Markdown. Be concise and technical.
