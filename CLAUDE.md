@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Rules
+
+Always respond in Spanish.
+
 ## Running the game
 
 No build step. Open directly or via a local server:
