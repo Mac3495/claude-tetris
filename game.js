@@ -43,6 +43,7 @@ const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let combo, maxCombo, maxLines;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -110,7 +111,12 @@ function clearLines() {
     score += (LINE_SCORES[cleared] || 0) * level;
     level = Math.floor(lines / 10) + 1;
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    combo++;
+    if (combo > maxCombo) maxCombo = combo;
+    if (lines > maxLines) maxLines = lines;
     updateHUD();
+  } else {
+    combo = 0;
   }
 }
 
@@ -220,11 +226,60 @@ function drawNext() {
       drawBlock(nextCtx, offX + c, offY + r, shape[r][c], NB);
 }
 
+const RECORDS_KEY = 'tetris-records';
+
+function loadRecords() {
+  try { return JSON.parse(localStorage.getItem(RECORDS_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveRecord(name, s, mc, ml) {
+  const records = loadRecords();
+  records.push({ name: name.trim() || 'AAA', score: s, maxCombo: mc, maxLines: ml });
+  records.sort((a, b) => b.score - a.score);
+  records.splice(5); // top 5
+  try { localStorage.setItem(RECORDS_KEY, JSON.stringify(records)); } catch (_) { /* quota/private mode */ }
+  return records;
+}
+
+function isTopFive(s) {
+  const records = loadRecords();
+  return records.length < 5 || s >= records[records.length - 1].score;
+}
+
+function renderRecords(records, newScore) {
+  const tbody = document.querySelector('#records-table tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  records.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    if (newScore !== null && r.score === newScore) tr.classList.add('new-record');
+    // Use textContent for user-controlled fields to prevent XSS
+    const cells = [i + 1, r.name, r.score.toLocaleString(), r.maxCombo, r.maxLines];
+    cells.forEach(val => {
+      const td = document.createElement('td');
+      td.textContent = val;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
 function endGame() {
   gameOver = true;
   cancelAnimationFrame(animId);
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
+
+  const inTop = isTopFive(score);
+  const nameSection = document.getElementById('name-section');
+  const nameInput = document.getElementById('player-name');
+  if (nameSection) nameSection.style.display = inTop ? 'block' : 'none';
+  if (nameInput) nameInput.value = '';
+
+  // Mostrar records actuales (sin la nueva entrada todavía)
+  renderRecords(loadRecords(), null);
+
   overlay.classList.remove('hidden');
 }
 
@@ -238,6 +293,10 @@ function togglePause() {
     cancelAnimationFrame(animId);
     overlayTitle.textContent = 'PAUSA';
     overlayScore.textContent = '';
+    // Hide records UI — it belongs only in game-over state
+    const nameSection = document.getElementById('name-section');
+    if (nameSection) nameSection.style.display = 'none';
+    renderRecords([], null);
     overlay.classList.remove('hidden');
   }
 }
@@ -268,6 +327,9 @@ function init() {
   gameOver = false;
   dropInterval = 1000;
   dropAccum = 0;
+  combo = 0;
+  maxCombo = 0;
+  maxLines = 0;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
@@ -303,6 +365,24 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+
+const saveScoreBtn = document.getElementById('save-score-btn');
+if (saveScoreBtn) {
+  saveScoreBtn.addEventListener('click', () => {
+    const name = document.getElementById('player-name').value;
+    const records = saveRecord(name, score, maxCombo, maxLines);
+    renderRecords(records, score);
+    document.getElementById('name-section').style.display = 'none';
+  });
+}
+
+const resetRecordsBtn = document.getElementById('reset-records-btn');
+if (resetRecordsBtn) {
+  resetRecordsBtn.addEventListener('click', () => {
+    localStorage.removeItem(RECORDS_KEY);
+    renderRecords([], null);
+  });
+}
 
 // Theme toggle
 const themeSwitch = document.getElementById('theme-switch');
