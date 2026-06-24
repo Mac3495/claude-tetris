@@ -28,6 +28,15 @@ const PIECES = [
   [[8]],                                       // Dot
 ];
 
+const SKIN_COLORS = {
+  retro:  [null, '#4dd0e1','#ffd54f','#ba68c8','#81c784','#e57373','#7986cb','#ffb74d','#009688'],
+  neon:   [null, '#00ffff','#ffff00','#ff00ff','#00ff88','#ff3366','#6699ff','#ff9900','#00ffcc'],
+  pastel: [null, '#b2ebf2','#fff9c4','#e1bee7','#c8e6c9','#ffcdd2','#c5cae9','#ffe0b2','#b2dfdb'],
+  pixel:  [null, '#4dd0e1','#ffd54f','#ba68c8','#81c784','#e57373','#7986cb','#ffb74d','#009688'],
+};
+
+let currentSkin = 'retro';
+
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
 const canvas = document.getElementById('board');
@@ -158,15 +167,52 @@ function updateHUD() {
   levelEl.textContent = level;
 }
 
+function setSkin(name) {
+  currentSkin = name;
+  document.body.dataset.skin = name;
+  localStorage.setItem('tetris-skin', name);
+  if (!gameOver) { draw(); drawNext(); }
+}
+
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
+  const palette = SKIN_COLORS[currentSkin] || SKIN_COLORS.retro;
+  const color = palette[colorIndex];
   context.globalAlpha = alpha ?? 1;
+
+  if (currentSkin === 'neon') {
+    context.shadowBlur = 12;
+    context.shadowColor = color;
+  } else {
+    context.shadowBlur = 0;
+  }
+
   context.fillStyle = color;
   context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+
+  if (currentSkin === 'pixel') {
+    // Patron pixel art: puntos oscuros en las esquinas
+    context.fillStyle = 'rgba(0,0,0,0.25)';
+    const s = size - 2;
+    const px = x * size + 1;
+    const py = y * size + 1;
+    const dot = Math.max(2, Math.floor(size / 8));
+    context.fillRect(px, py, dot, dot);
+    context.fillRect(px + s - dot, py, dot, dot);
+    context.fillRect(px, py + s - dot, dot, dot);
+    context.fillRect(px + s - dot, py + s - dot, dot, dot);
+    // Cruz central
+    const cx = px + Math.floor(s / 2);
+    const cy = py + Math.floor(s / 2);
+    context.fillRect(cx - 1, py, 2, s);
+    context.fillRect(px, cy - 1, s, 2);
+  } else if (currentSkin !== 'neon') {
+    // highlight estandar (retro y pastel)
+    context.fillStyle = 'rgba(255,255,255,0.12)';
+    context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+  }
+
+  context.shadowBlur = 0;
   context.globalAlpha = 1;
 }
 
@@ -320,6 +366,18 @@ const savedTheme = localStorage.getItem('tetris-theme');
 if (savedTheme === 'light') {
   themeSwitch.checked = true;
   applyTheme(true);
+}
+
+// Skin selector
+const skinSelect = document.getElementById('skin-select');
+if (skinSelect) {
+  skinSelect.addEventListener('change', e => setSkin(e.target.value));
+
+  // Aplicar skin guardada al cargar
+  const savedSkin = localStorage.getItem('tetris-skin') || 'retro';
+  currentSkin = savedSkin;
+  skinSelect.value = savedSkin;
+  document.body.dataset.skin = savedSkin;
 }
 
 init();
